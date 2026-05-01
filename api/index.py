@@ -54,17 +54,34 @@ def getAirportTemp(iata: str):
  
  
 def getStockPrice(stock: str):
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{stock}"
-    resp = requests.get(
-        url,
-        headers={"User-Agent": "Mozilla/5.0"},
-        timeout=10,
-    ).json()
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{stock}"
+        resp = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10,
+        ).json()
+        result = resp.get("chart", {}).get("result")
+        if result:
+            price = result[0].get("meta", {}).get("regularMarketPrice")
+            if price is not None:
+                return price
+    except Exception:
+        pass
 
-    result = resp.get("chart", {}).get("result")
-    if not result:
+    # Fallback for missing tickers - CHK
+    token = os.environ.get("TIINGO_TOKEN", "")
+    if not token:
         return None
-    return result[0].get("meta", {}).get("regularMarketPrice")
+    try:
+        url = f"https://api.tiingo.com/tiingo/daily/{stock.lower()}/prices"
+        resp = requests.get(url, params={"token": token}, timeout=10).json()
+        if isinstance(resp, list) and resp:
+            return float(resp[-1].get("close"))
+    except Exception:
+        pass
+
+    return None
  
 
 @app.route('/', methods=['GET'])
